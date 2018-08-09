@@ -59,6 +59,8 @@ Packages are initially loaded with the "install.packages()" function.  **HOWEVER
 
 "tokenizers" is a package which turns a text into a character vector.  An introduction to the package can be found here (https://cran.r-project.org/web/packages/tokenizers/vignettes/introduction-to-tokenizers.html).
 
+"xml2" is a package for working with xml files
+
 ```{r installations, warning=FALSE, eval=FALSE}
 install.packages("ggmap")
 install.packages("ggplot2")
@@ -70,7 +72,7 @@ install.packages("SnowballC")
 install.packages("stm")
 install.packages("tm")
 install.packages("tokenizers")
-
+install.packages("xml2")
 ```
 
 
@@ -89,6 +91,7 @@ library(SnowballC)
 library(stm)
 library(tm)
 library(tokenizers)
+library(xml2)
 ```
 
 ### coreNLP

@@ -55,14 +55,12 @@ To create the data frame compiling every reference to a term, or to upload the l
 
   if(DCATSDataChange1|DCATSDataChange2 == TRUE) {
   
-      files <- list.files(path = DCATSdoclocation, pattern = "xml", full.names = TRUE) #creates vector of txt file names.
+      files <- list.files(path = DCATSdoclocation, pattern = "xml", full.names = TRUE) #creates vector of xml file names.
       if(file.exists(DCATSoutputlocation) == FALSE){dir.create(DCATSoutputlocation)}
       DCATSstemsearchedtermlist <- unique(wordStem(DCATSsearchedtermlist)) #lemmatizes the list of terms you want to search for.
       DCATSWordFlagmat <- matrix(,ncol=12,nrow=1)
       for (i in 1:length(files)) {
-        fileName <- read_file(files[i])
-        Encoding(fileName) <- "UTF-8"  #since tokenize_sentences function requires things to be encoded in UTF-8, need to remove some data.
-        fileName <- iconv(fileName, "UTF-8", "UTF-8",sub='')
+        fileName <- xml_text(read_xml(files[i]))
         ltoken <- tokenize_words(fileName, lowercase = TRUE, stopwords = NULL, simplify = FALSE)
         ltoken <- unlist(ltoken)
         stemltoken <- wordStem(ltoken) #this uses the Snowball library to lemmatize the entire text.
@@ -78,20 +76,20 @@ To create the data frame compiling every reference to a term, or to upload the l
                 if (j <= DCATSPOSconlength) {POStempvec <- ltoken[(1:(j+DCATSPOSconlength))]}
                 if (j > DCATSPOSconlength) {POStempvec <- ltoken[(j-DCATSPOSconlength):(j+DCATSPOSconlength)]}
                 TempTextName <- gsub(paste0(DCATSdoclocation,"/"),"",files[i]) #This grabs just the end of the file path.
-                TempTextName <- gsub(".txt","",TempTextName) #This removes the .txt from the end of the name.
+                TempTextName <- gsub(".xml","",TempTextName) #This removes the .xml from the end of the name.
                 temprow <- matrix(,ncol=12,nrow=1)
                 colnames(temprow) <- c("Text", "Text_ID", "DCATSstemsearchedterm","Lemma","Lemma_Perc","KWIC","Total_Lemma","Date","Category","Short_KWIC","POS_KWIC","Current_Date")
-                temprow[1,1] <- TempTextName
+                temprow[1,1] <- strsplit(TempTextName,"_")[[1]][3]
                 temprow[1,2] <- textID
                 temprow[1,3] <- DCATSstemsearchedterm
                 temprow[1,4] <- j
                 temprow[1,5] <- (j/length(stemltoken))*100
                 temprow[1,6] <- as.character(paste(longtempvec,sep= " ",collapse=" "))
                 temprow[1,7] <- length(stemltoken)
-                temprow[1,8] <- strsplit(TempTextName,"_")[[1]][1]
+                temprow[1,8] <- strsplit(TempTextName,"_")[[1]][2]
                 #Determining Category
-                  if(DCATSstemsearchedterm %in% wordStem(DCATScatsearchedtermlist)) {temprow[1,9] <- "cat-Rhetoric"}
-                  if(DCATSstemsearchedterm %in% wordStem(DCATSdogsearchedtermlist)) {temprow[1,9] <- "dog-Rhetoric"}
+                  if(DCATSstemsearchedterm %in% wordStem(DCATScatsearchedtermlist)) {temprow[1,9] <- "Cat-References"}
+                  if(DCATSstemsearchedterm %in% wordStem(DCATSdogsearchedtermlist)) {temprow[1,9] <- "Dog-References"}
                 temprow[1,10] <- as.character(paste(shorttempvec,sep= " ",collapse=" "))
                 temprow[1,11] <- as.character(paste(POStempvec,sep= " ",collapse=" "))
                 temprow[1,12] <- format(Sys.time(), "%Y-%m-%d")
@@ -109,30 +107,35 @@ To create the data frame compiling every reference to a term, or to upload the l
     print("Loading the previous dataset as DCATSWordFlagdf")
     DCATSWordFlagdf <- read.table(DCATSWordFlagdfPath)
   }
+DCATSWordFlagdf$KWIC = as.character(DCATSWordFlagdf$KWIC)
+      DCATSWordFlagdf$Text = as.character(DCATSWordFlagdf$Text)
 DCATSWordFlagdf
 ```
 
-We can then add up the values in DCATSWordFlagdf to make a table of the frequency of cat and dog rhetoric, DCATSFreqmat. This step is important because we also introduce a new column: "Sample_KWIC", which randomly chooses one example of Key Words in Context.
+We should note that there are going to be some false references here. For instance, two of the references to cats in Bleak House will be to Monsieur Le Cat.
+
+We can then add up the values in DCATSWordFlagdf to make a table of the frequency of cat and dog references, DCATSFreqmat. This step is important because we also introduce a new column: "Sample_KWIC", which randomly chooses one example of Key Words in Context.
 ```{r,  eval=FALSE}
   # Adding values from DCATSWordFlagdf together to get a matrix of normalized frequencies for each category, as DCATSFreqmat
-      DCATSWordFlagcatdf <- DCATSWordFlagdf[grep("cat-Rhetoric",DCATSWordFlagdf$Category),]
-      DCATSWordFlagdogdf <- DCATSWordFlagdf[grep("dog-Rhetoric",DCATSWordFlagdf$Category),]
+      DCATSWordFlagcatdf <- DCATSWordFlagdf[grep("Cat-References",DCATSWordFlagdf$Category),]
+      DCATSWordFlagdogdf <- DCATSWordFlagdf[grep("Dog-References",DCATSWordFlagdf$Category),]
       DCATSFreqmat <- matrix(,ncol=8,nrow=1)
-      files <- list.files(path = DCATSdoclocation, pattern = "txt", full.names = TRUE) #creates vector of txt file names.
+      files <- list.files(path = DCATSdoclocation, pattern = "xml", full.names = TRUE) #creates vector of xml file names.
       for (i in 1:length(files)) {
-        TempTextName <- gsub(paste0(DCATSdoclocation,"/"),"",files[i]) #This grabs just the end of the file path.
-        TempTextName <- gsub(".txt","",TempTextName) #This removes the .txt from the end of the name.
+        TempFileName <- gsub(paste0(DCATSdoclocation,"/"),"",files[i]) #This grabs just the end of the file path.
+        TempFileName <- gsub(".xml","",TempFileName) #This removes the .xml from the end of the name.
+        TempTextName <- strsplit(TempFileName,"_")[[1]][3] #This just grabs the title
         tempcatdf <- DCATSWordFlagcatdf[grep(TempTextName,DCATSWordFlagcatdf$Text),]
         tempdogdf <- DCATSWordFlagdogdf[grep(TempTextName,DCATSWordFlagdogdf$Text),]
-        TempDate <- strsplit(TempTextName,"_")[[1]][1]
+        TempDate <- strsplit(TempFileName,"_")[[1]][2]
         TempLength <- tempcatdf$Total_Lemma[1]
         temprows <- matrix(,ncol=8,nrow=2)
         colnames(temprows) <- c("Text", "Text_ID","Date","Category","Frequency","Total_Lemma","Normalized_Freq","Sample_KWIC")
         temprows[1:2,1] <- as.character(TempTextName)
         temprows[1:2,2] <- i
         temprows[1:2,3] <- as.character(TempDate)
-        temprows[1,4] <- "cat-Rhetoric"
-        temprows[2,4] <- "dog-Rhetoric"
+        temprows[1,4] <- "Cat-References"
+        temprows[2,4] <- "Dog-References"
         temprows[1,5] <- nrow(tempcatdf)
         temprows[2,5] <- nrow(tempdogdf)
         temprows[1:2,6]<- as.character(TempLength)
@@ -146,20 +149,19 @@ We can then add up the values in DCATSWordFlagdf to make a table of the frequenc
       }
       DCATSFreqmat <- DCATSFreqmat[-1,]
       DCATSFreqdf <- as.data.frame(DCATSFreqmat)
-      DCATSWordFlagdf$KWIC = as.character(DCATSWordFlagdf$KWIC)
-      DCATSWordFlagdf$Text = as.character(DCATSWordFlagdf$Text)
+      
       DCATSFreqdf
 
 ```
 
-We can then answer questions using DCATSFreqdf.  For instance, we can see that dog rhetoric rises in *Reports* over time.
+We can then answer questions using DCATSFreqdf.  For instance, we can see that Dickens references dogs far more often than cats in his novels.
 
 ```{r DCATSFreqmat by date,  eval=FALSE}
       
   # Visualizing DCATSFreqdf
       p <- ggplot(DCATSFreqdf, aes(y = as.numeric(as.character(Normalized_Freq)), x = as.numeric(as.character(Date)), color = Category))
       pg <- geom_point(size=1,pch = 16)
-      pl <- p + pg + labs(x = "Date", y = "Normalized Frequency (% of Words in Text)", title = "Appearances of cat and dog Rhetoric within Reports of the DCATS")
+      pl <- p + pg + labs(x = "Date", y = "Normalized Frequency (% of Words in Text)", title = "Appearances of 'cat' and 'dog' within Dickens's Novels")
       pl
 ```
 
@@ -170,63 +172,76 @@ Or we can create an interactive graph that shows us an example key word in conte
   # Visualizing DCATSFreqdf
       p <- ggplot(DCATSFreqdf, aes(y = as.numeric(as.character(Normalized_Freq)), x = as.numeric(as.character(Date)), color = Category, label = Sample_KWIC))
       pg <- geom_point(size=1,pch = 16)
-      pl <- p + pg + labs(x = "Date", y = "Normalized Frequency (% of Words in Text)", title = "Appearances of cat and dog Rhetoric within \nReports of the DCATS")
+      pl <- p + pg + labs(x = "Date", y = "Normalized Frequency (% of Words in Text)", title = "Appearances of 'cat' and 'dog' in Dickens's Novels")
       ggplotly(pl)
 
 ```
 
-But as Tufte points out, time-series graphics are not good indicators of cause. For instance, even though intuition might tell us that cat rhetoric would decrease when dog rhetoric increases, I don't THINK that's the case here. But we should check, by charting cat values on the x axis and corresponding dog values on the y axis.
-```{r DCATS causality, eval=FALSE}
-#first we create a slightly different version of DCATSFreqmat
-      DCATSWordFlagcatdf <- DCATSWordFlagdf[grep("cat-Rhetoric",DCATSWordFlagdf$Category),]
-      DCATSWordFlagdogdf <- DCATSWordFlagdf[grep("dog-Rhetoric",DCATSWordFlagdf$Category),]
-      NewDCATSFreqmat <- matrix(,ncol=8,nrow=1)
-      files <- list.files(path = DCATSdoclocation, pattern = "txt", full.names = TRUE) #creates vector of txt file names.
-      for (i in 1:length(files)) {
-        TempTextName <- gsub(paste0(DCATSdoclocation,"/"),"",files[i]) #This grabs just the end of the file path.
-        TempTextName <- gsub(".txt","",TempTextName) #This removes the .txt from the end of the name.
-        tempcatdf <- DCATSWordFlagcatdf[grep(TempTextName,DCATSWordFlagcatdf$Text),]
-        tempdogdf <- DCATSWordFlagdogdf[grep(TempTextName,DCATSWordFlagdogdf$Text),]
-        TempDate <- strsplit(TempTextName,"_")[[1]][1]
-        TempLength <- tempcatdf$Total_Lemma[1]
-        temprows <- matrix(,ncol=8,nrow=1)
-        colnames(temprows) <- c("Text", "Text_ID","Date","cat_Freq","dog_Freq","Total_Lemma","cat_Norm_Freq","dog_Norm_Freq")
-        temprows[1,1] <- as.character(TempTextName)
-        temprows[1,2] <- i
-        temprows[1,3] <- as.character(TempDate)
-        temprows[1,4] <- nrow(tempcatdf)
-        temprows[1,5] <- nrow(tempdogdf)
-        temprows[1,6]<- as.character(TempLength)
-        temprows[1,7] <- (as.numeric(temprows[1,4])/as.numeric(temprows[1,6]))*100
-        temprows[1,8] <- (as.numeric(temprows[1,5])/as.numeric(temprows[1,6]))*100
-        NewDCATSFreqmat <- rbind(NewDCATSFreqmat,temprows)
-      }
-      NewDCATSFreqmat <- NewDCATSFreqmat[-1,]
-      NewDCATSFreqdf <- as.data.frame(NewDCATSFreqmat)
-      NewDCATSFreqdf
-      #I want to add another column so I can add a third variable of date, aligned with the darkness of the dots.
-      NewDCATSFreqdf$Year <- as.numeric(as.character(NewDCATSFreqdf$Date))
+
+Or we can create an interactive graph that shows us the novel we're looking at on rollover. Bleak House and Edwin Drood are apparently the only novels where references to cats approach references to dogs.
+
+```{r DCATSFreqmat by date interactive text,  eval=FALSE}
       
-      p <- ggplot(NewDCATSFreqdf, aes(y = as.numeric(as.character(dog_Norm_Freq)), x = as.numeric(as.character(cat_Norm_Freq)), alpha = Year))
+  # Visualizing DCATSFreqdf
+      p <- ggplot(DCATSFreqdf, aes(y = as.numeric(as.character(Normalized_Freq)), x = as.numeric(as.character(Date)), color = Category, label = Text))
       pg <- geom_point(size=1,pch = 16)
-      pl <- p + pg + labs(x = "Normalized Frequency of 'cat' (% of Words in Volume)", y = "Normalized Frequency of 'dog,' 'doger,' \nand 'Labor' (% of Words in Volume)", title = "Appearances of Cat and dog Rhetoric within Reports of the DCATS")
+      pl <- p + pg + labs(x = "Date", y = "Normalized Frequency (% of Words in Text)", title = "Appearances of 'cat' and 'dog' in Dickens's Novels")
+      ggplotly(pl)
+
+```
+
+We can verify this by looking at the raw frequencies. Cats and dogs are most equal in Edwin Drood. By far the biggest discrepancy between cats and dogs is in Oliver Twist.
+
+```{r DCATSFreqmat by novel,  eval=FALSE}
+      
+  # Visualizing DCATSFreqdf
+      p <- ggplot(DCATSFreqdf, aes(y = as.numeric(as.character(Frequency)), x = as.numeric(as.character(Date)), color = Category, label = Text))
+      pg <- geom_point(size=1,pch = 16)
+      pl <- p + pg + labs(x = "Date", y = "Frequency (# of References in Text)", title = "Appearances of 'cat' and 'dog' in Dickens's Novels")
+      ggplotly(pl)
+
+```
+
+We can make this EVEN CLEARER by instead visualizing the difference between cats and dogs in each novel. So cat lovers should either turn to Bleak House or Edwin Drood
+```{r}
+difference <- matrix(,ncol=3,nrow=1)        
+files <- list.files(path = DCATSdoclocation, pattern = "xml", full.names = TRUE) #creates vector of xml file names.
+      for (i in 1:length(files)) {
+        TempFileName <- gsub(paste0(DCATSdoclocation,"/"),"",files[i]) #This grabs just the end of the file path.
+        TempFileName <- gsub(".xml","",TempFileName) #This removes the .xml from the end of the name.
+        TempTextName <- strsplit(TempFileName,"_")[[1]][3] #This just grabs the title
+        TempDate <- strsplit(TempFileName,"_")[[1]][2]
+        tempdf <- DCATSFreqdf[grep(TempTextName,DCATSFreqdf$Text),]
+        temprows <- matrix(,ncol=3,nrow=1)
+        colnames(temprows) <- c("Text","Date","DogCatDif")
+        temprows[1,1] <- as.character(TempTextName)
+        temprows[1,2] <- as.character(TempDate)
+        temprows[1,3] <- as.numeric(as.character(tempdf[grep("Dog-References",tempdf$Category),][1,5]))-as.numeric(as.character(tempdf[grep("Cat-References",tempdf$Category),][1,5]))
+
+        difference <- rbind(difference,temprows)
+      }
+      difference <- difference[-1,]
+      differencedf <- as.data.frame(difference)
+      differencedf
+      
+      p <- ggplot(differencedf, aes(y = as.numeric(as.character(DogCatDif)), x = as.factor(Text)))
+      pg <- geom_bar(stat="identity")
+      pl <- p + pg + labs(y = "Dog References - Cat References", x = "Text", title = "Comparison of 'cat' and 'dog' in Dickens's Novels") + scale_x_discrete(limits=differencedf$Text) + coord_flip()
       pl
 ```
 
-We can also visualize the terms which most frequently occur around the search terms in the two categories within this corpus.
+We can also visualize the terms which most frequently occur around the search terms in the two categories within this corpus. Interestingly, cats seem to be associated with women and dogs with men.
 ```{r DCATS dog/cat associations,  eval=FALSE}
 corpus <- corpus(DCATSWordFlagdf, 
                  docid_field="Text", 
                  text_field="KWIC")
-group_DCATSWordFlagdfm <- dfm(corpus, remove=c(stopwords("en"),DCATSsearchedtermlist), remove_punct=TRUE, remove_numbers = TRUE, groups="Category")
+group_DCATSWordFlagdfm <- dfm(corpus, remove=c(stopwords("en"),"cat","cats","dogs","dog"), remove_punct=TRUE, remove_numbers = TRUE, groups="Category")
 textplot_wordcloud(group_DCATSWordFlagdfm,max.words=50, colors = RColorBrewer::brewer.pal(8,"Dark2"), comparison=TRUE)
 
 
 ```
 
-Finally, we can run a very rudimentary qualitative sentiment analysis by looking at JUST the adjectives which appear around the term (for instance, within a 10 word range on either side). This requires part of speech (POS) tagging, which can take a very long time, which is why we are doging from the "POS_KWIC" column of "DCATSWordFlagdf." This also requires the use of the coreNLP library, which can take a long time to install and initialize, So this section has an extra parameter to initialize it.  
-
-**If you want to run a POS tagging script to view the most common adjectives and adverbs that accompany cat and dog rhetoric in the corpus, enter "DECDCATSPOSApp <- TRUE" BELOW.**
+Finally, we can run a very rudimentary qualitative sentiment analysis by looking at JUST the adjectives which appear around the term (for instance, within a 10 word range on either side).  This also requires the use of the coreNLP library, which can take a long time to install and initialize.
 
 **IMPORTANT NOTE: Since creating a Word Flag matrix can take a nontrivial amount of time for larger corpuses, this script is designed only to run the program to create a new DCATSWordFlagdf if there is a change to the dataset in folder "Documents" or if the previous DCATSKWICPOScatdf and DCATSKWICPOSdogdf has been deleted.**
 
@@ -249,7 +264,7 @@ Then we run a script to create dataset which identify and mark each of the adjec
   
   if(DCATSDataChange1|DCATSDataChange3 == TRUE) {
     #we run part of speech tagging on each of these KWIC and draw out just the adjectives, and sum up the numbers.
-      #We do this for the cat rhetoric data.
+      #We do this for the cat References data.
         ADJADVcatdf <- data.frame( Var1=character(),Freq=numeric())
         for(i in 1:nrow(DCATSWordFlagcatdf)) {
           tempstring <- as.character(DCATSWordFlagcatdf$POS_KWIC[i])
@@ -259,13 +274,13 @@ Then we run a script to create dataset which identify and mark each of the adjec
           index <- c(which(ut=="ADJ"), which(ut=="ADV"))
           temptable <- table(token$lemma[index])
           ADJADVcatdf <- rbind(ADJADVcatdf,as.data.frame(temptable))
-          print(i)
+          print(paste0(i," out of ",nrow(DCATSWordFlagcatdf)))
         }
         ADJADVcatdf <- aggregate(ADJADVcatdf$Freq, b=list(Category=ADJADVcatdf$Var1), FUN=sum)
         DCATSKWICPOScatdf <- ADJADVcatdf[order(ADJADVcatdf$x, decreasing=TRUE),]  #reordering the matrix
         write.table(DCATSKWICPOScatdf, DCATSKWICPOScatdfPath)
         
-      #And for the dog rhetoric data.
+      #And for the dog References data.
         ADJADVdogdf <- data.frame( Var1=character(),Freq=numeric())
         for(i in 1:nrow(DCATSWordFlagdogdf)) {
           tempstring <- as.character(DCATSWordFlagdogdf$POS_KWIC[i])
@@ -275,7 +290,7 @@ Then we run a script to create dataset which identify and mark each of the adjec
           index <- c(which(ut=="ADJ"), which(ut=="ADV"))
           temptable <- table(token$lemma[index])
           ADJADVdogdf <- rbind(ADJADVdogdf,as.data.frame(temptable))
-          print(i)
+          print(paste0(i," out of ",nrow(DCATSWordFlagdogdf)))
         }
         ADJADVdogdf <- aggregate(ADJADVdogdf$Freq, b=list(Category=ADJADVdogdf$Var1), FUN=sum)
         DCATSKWICPOSdogdf <- ADJADVdogdf[order(ADJADVdogdf$x, decreasing=TRUE),]  #reordering the matrix
@@ -297,15 +312,15 @@ Finally, we visualize the top 25 adjectives and adverbs in these KWIC sets. In t
         TopADJADVdogdf <- DCATSKWICPOSdogdf[1:25,]
         TopADJADVdogdf$Category <- factor(TopADJADVdogdf$Category, levels = TopADJADVdogdf$Category[order(TopADJADVdogdf$x)])
     
-        #Then we visualize the top 25 adjectives and adverbs for dog and cat rhetoric.
+        #Then we visualize the top 25 adjectives and adverbs for dog and cat References.
            p1 <- ggplot(TopADJADVcatdf, aes(y = as.numeric(as.character(x)), x = (Category)))
            p2 <- geom_bar(stat="identity") 
-           p3 <- p1 + p2 + labs(x = "Adjective/Adverb near cat Rhetoric", y = "Frequency", title = "Common Adjectives and Adverbs near cat Rhetoric \nwithin Reports of the DCATS")
+           p3 <- p1 + p2 + labs(x = "Adjective/Adverb near cat References", y = "Frequency", title = "Common Adjectives and Adverbs near cat References \nwithin Dickens's Novels")
            pl1 <- p3+coord_flip()
           
             p4 <- ggplot(TopADJADVdogdf, aes(y = as.numeric(as.character(x)), x = (Category)))
            p5 <- geom_bar(stat="identity") 
-           p6 <- p4 + p5 + labs(x = "Adjective/Adverb near cat Rhetoric", y = "Frequency", title = "Common Adjectives and Adverbs near dog Rhetoric \nwithin Reports of the DCATS")
+           p6 <- p4 + p5 + labs(x = "Adjective/Adverb near Cat References", y = "Frequency", title = "Common Adjectives and Adverbs near Dog References \nwithin Dickens's Novels")
            pl2 <- p6+coord_flip()
            {print(pl1)
            print(pl2)}
