@@ -195,10 +195,10 @@ We can verify this by looking at the raw frequencies. Cats and dogs are most equ
 ```{r DCATSFreqmat by novel,  eval=FALSE}
       
   # Visualizing DCATSFreqdf
-      p <- ggplot(DCATSFreqdf, aes(y = as.numeric(as.character(Frequency)), x = as.numeric(as.character(Date)), color = Category, label = Text))
-      pg <- geom_point(size=1,pch = 16)
-      pl <- p + pg + labs(x = "Date", y = "Frequency (# of References in Text)", title = "Appearances of 'cat' and 'dog' in Dickens's Novels")
-      ggplotly(pl)
+      p <- ggplot(DCATSFreqdf, aes(y = as.numeric(as.character(Frequency)), x = Text, fill = Category))
+      pg <- geom_bar(stat="identity",position=position_dodge())
+      pl <- p + pg + labs(x = "Text", y = "Frequency (# of References in Text)", title = "Appearances of 'cat' and 'dog' in Dickens's Novels") + scale_x_discrete(limits=differencedf$Text) + coord_flip()
+      pl
 
 ```
 
